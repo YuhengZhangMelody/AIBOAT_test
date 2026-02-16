@@ -38,42 +38,78 @@ from boat_env import BoatSlalomEnv, EnvConfig
 
 
 
-def get_rl_state(boat, current_goal):
-    """Fonction d'état pour l'agent RL - AVEC angle vers goal"""
-    import math
-    
+def get_rl_state(boat, current_goal, buoys, prev_action, target_side):
+    """Build policy observation consistent with BoatSlalomEnv."""
     dist_to_goal = current_goal.get_distance(boat)
-    
-    # Calculer l'angle vers le goal (NOUVEAU)
+
     goal_x, goal_y = current_goal.get_position(boat)
     angle_to_goal = math.atan2(goal_y - boat.y, goal_x - boat.x)
     angle_error = angle_to_goal - boat.theta
-    # Normaliser entre -pi et pi
-    angle_error = math.atan2(math.sin(angle_error), math.cos(angle_error))
-    
-    return np.array([
-        boat.x,
-        boat.y,
-        boat.theta,
-        boat.v,
-        boat.omega,
-        dist_to_goal,
-        angle_error  # ← NOUVEAU !
-    ], dtype=np.float32)
+    cos_err = math.cos(angle_error)
+    sin_err = math.sin(angle_error)
+
+    target_buoy = None
+    if buoys:
+        target_buoy = min(buoys, key=lambda b: (b.x - goal_x) ** 2 + (b.y - goal_y) ** 2)
+
+    v_vec = np.array([boat.v * math.cos(boat.theta), boat.v * math.sin(boat.theta)], dtype=np.float64)
+    v_radial = 0.0
+    v_tangent = 0.0
+    d_buoy = 999.0
+
+    if target_buoy is not None:
+        dx = boat.x - target_buoy.x
+        dy = boat.y - target_buoy.y
+        d_buoy = math.hypot(dx, dy)
+        if d_buoy < 1e-6:
+            e_r = np.array([1.0, 0.0], dtype=np.float64)
+        else:
+            e_r = np.array([dx / d_buoy, dy / d_buoy], dtype=np.float64)
+
+        if target_side > 0:
+            e_t = np.array([-e_r[1], e_r[0]], dtype=np.float64)
+        else:
+            e_t = np.array([e_r[1], -e_r[0]], dtype=np.float64)
+
+        v_radial = float(np.dot(v_vec, e_r))
+        v_tangent = float(np.dot(v_vec, e_t))
+
+    return np.array(
+        [
+            boat.x,
+            boat.y,
+            boat.theta,
+            boat.v,
+            boat.omega,
+            dist_to_goal,
+            cos_err,
+            sin_err,
+            float(prev_action[0]),
+            float(prev_action[1]),
+            float(target_side),
+            v_radial,
+            v_tangent,
+            d_buoy,
+        ],
+        dtype=np.float32,
+    )
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Run PPO policy with Pygame visualization.")
     parser.add_argument("--model", type=str, default=None, help="Path to PPO zip model.")
     parser.add_argument("--vecnorm", type=str, default=None, help="Path to VecNormalize stats (.pkl).")
+    parser.add_argument("--target-side", type=int, default=1, choices=[-1, 1], help="Orbit direction: +1 CCW, -1 CW.")
     return parser.parse_args()
 
 
-def build_obs_normalizer(vecnorm_path):
+def build_obs_normalizer(vecnorm_path, target_side):
     if not vecnorm_path or not os.path.exists(vecnorm_path):
         return None
 
-    dummy_env = DummyVecEnv([lambda: BoatSlalomEnv(env_config=EnvConfig.from_parameters(parameters))])
+    env_config = EnvConfig.from_parameters(parameters)
+    env_config.target_side = int(target_side)
+    dummy_env = DummyVecEnv([lambda: BoatSlalomEnv(env_config=env_config)])
     vec_env = VecNormalize.load(vecnorm_path, dummy_env)
     vec_env.training = False
     vec_env.norm_reward = False
@@ -125,8 +161,10 @@ def main():
 
     # Modèle de bateau
     boat = Boat(parameters.init_x, parameters.init_y, parameters.init_yaw, alpha=150)
-    boat.v = parameters.init_v
+    boat.v = max(0.5, parameters.init_v)
     boat.omega = 0.0
+    prev_action = np.array([boat.v, boat.omega], dtype=np.float32)
+    target_side = int(args.target_side)
 
 
     ####### RL Agent #######
@@ -145,7 +183,7 @@ def main():
         print("Entraîne d'abord le modèle avec train_rl.py")
         return
 
-    obs_normalizer = build_obs_normalizer(vecnorm_path)
+    obs_normalizer = build_obs_normalizer(vecnorm_path, args.target_side)
     if obs_normalizer is None:
         print("Info: aucune normalisation d'observation chargée (VecNormalize absent).")
     else:
@@ -182,7 +220,7 @@ def main():
 
         ####### RL Agent #######
         # Obtenir l'état pour l'agent RL
-        state = get_rl_state(boat, current_goal)
+        state = get_rl_state(boat, current_goal, buoys, prev_action, target_side)
         state_for_policy = normalize_state(obs_normalizer, state)
         
         # L'agent RL choisit l'action [v, omega]
@@ -198,6 +236,7 @@ def main():
         boat.theta = pose_next[2, 0]
         boat.v = u[0]
         boat.omega = u[1]
+        prev_action = np.array([boat.v, boat.omega], dtype=np.float32)
         
         # Store trajectory
         trajectory.append([boat.x, boat.y, boat.theta, boat.v, boat.omega])

@@ -24,6 +24,9 @@ def parse_args():
     parser.add_argument("--timesteps", type=int, default=1_400_000, help="Total training timesteps.")
     parser.add_argument("--n-envs", type=int, default=4, help="Number of parallel training environments.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed.")
+    parser.add_argument("--target-side", type=int, default=1, choices=[-1, 1], help="Orbit direction: +1 CCW, -1 CW.")
+    parser.add_argument("--target-radius", type=float, default=3.0, help="Desired orbit radius around buoy (m).")
+    parser.add_argument("--transition-radius", type=float, default=6.0, help="Distance where reward weights start transitioning.")
     return parser.parse_args()
 
 
@@ -37,6 +40,9 @@ def main():
     os.makedirs(logs_dir, exist_ok=True)
 
     env_config = EnvConfig.from_parameters(parameters)
+    env_config.target_side = int(args.target_side)
+    env_config.target_radius = float(args.target_radius)
+    env_config.transition_radius = float(args.transition_radius)
 
     # Sanity check on a single environment before vectorized training
     check_env(BoatSlalomEnv(env_config=env_config))
