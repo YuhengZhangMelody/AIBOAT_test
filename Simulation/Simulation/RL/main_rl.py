@@ -4,6 +4,7 @@ import numpy as np
 import math
 import sys
 import os
+import argparse
 "ALLER dans IABoat/Simulation/Simulation/simulation_parameters.py "
 "et tout commenter sauf parameters.test_waypoint_segments()"
 
@@ -32,6 +33,8 @@ from simulation_parameters import parameters
 from pygame_manager import *
 from classes import *
 from stable_baselines3 import PPO
+from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+from boat_env import BoatSlalomEnv, EnvConfig
 
 
 
@@ -59,8 +62,34 @@ def get_rl_state(boat, current_goal):
     ], dtype=np.float32)
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Run PPO policy with Pygame visualization.")
+    parser.add_argument("--model", type=str, default=None, help="Path to PPO zip model.")
+    parser.add_argument("--vecnorm", type=str, default=None, help="Path to VecNormalize stats (.pkl).")
+    return parser.parse_args()
+
+
+def build_obs_normalizer(vecnorm_path):
+    if not vecnorm_path or not os.path.exists(vecnorm_path):
+        return None
+
+    dummy_env = DummyVecEnv([lambda: BoatSlalomEnv(env_config=EnvConfig.from_parameters(parameters))])
+    vec_env = VecNormalize.load(vecnorm_path, dummy_env)
+    vec_env.training = False
+    vec_env.norm_reward = False
+    return vec_env
+
+
+def normalize_state(vecnorm_env, state):
+    if vecnorm_env is None:
+        return state
+    normalized = vecnorm_env.normalize_obs(state.reshape(1, -1))
+    return normalized[0]
+
+
 def main():
     """Main simulation function with RL agent"""
+    args = parse_args()
     print(__file__ + " start!!")
 
     #################### Initialisation ####################
@@ -101,13 +130,26 @@ def main():
 
 
     ####### RL Agent #######
+    default_model = os.path.join(script_dir, "models", "best_model.zip")
+    legacy_model = os.path.join(script_dir, "boat_slalom_ppo_best.zip")
+    model_path = args.model or (default_model if os.path.exists(default_model) else legacy_model)
+
+    default_vecnorm = os.path.join(script_dir, "models", "vecnormalize.pkl")
+    vecnorm_path = args.vecnorm or default_vecnorm
+
     try:
-        model = PPO.load(os.path.join(script_dir, "boat_slalom_ppo_best.zip"))
+        model = PPO.load(model_path)
         print("Modèle RL chargé avec succès!")
     except FileNotFoundError:
-        print("ERREUR: Modèle 'boat_slalom_ppo_best.zip' non trouvé!")
+        print(f"ERREUR: Modèle '{model_path}' non trouvé!")
         print("Entraîne d'abord le modèle avec train_rl.py")
         return
+
+    obs_normalizer = build_obs_normalizer(vecnorm_path)
+    if obs_normalizer is None:
+        print("Info: aucune normalisation d'observation chargée (VecNormalize absent).")
+    else:
+        print(f"Statistiques VecNormalize chargées: {vecnorm_path}")
 
 
     # No initial command
@@ -141,9 +183,10 @@ def main():
         ####### RL Agent #######
         # Obtenir l'état pour l'agent RL
         state = get_rl_state(boat, current_goal)
+        state_for_policy = normalize_state(obs_normalizer, state)
         
         # L'agent RL choisit l'action [v, omega]
-        action, _ = model.predict(state, deterministic=True)
+        action, _ = model.predict(state_for_policy, deterministic=True)
         u = action.tolist()
         
         # Update robot state directement (pas de SLAM)
@@ -252,6 +295,8 @@ def main():
 
 
     pygame.quit()
+    if obs_normalizer is not None:
+        obs_normalizer.close()
 
 
 
