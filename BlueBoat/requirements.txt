@@ -1,0 +1,5 @@
+pygame>=2.0
+pymavlink>=2.4
+pyzed>=3.8
+numpy>=1.23
+

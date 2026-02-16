@@ -1,0 +1,8 @@
+Port de monaco.png : Scale : 54 pixels pour 20 mètres
+Bouée origine à (458, 537)
+
+Port de monaco 2.png : Scale : 100 pixels pour 20 mètres
+Bouée origine à (575, 417)
+
+Lac du mail.png : Scale : 431.1 pixels pour 54.10 mètres
+Origine à (350, 570) (Le haut de la ligne milieu du panneau solaire)

@@ -1,0 +1,29 @@
+Modéliser toutes les autres courses [1 personne] Clément
+Rayon de courbure Enzo
+RL Julien, Yueng
+Intégration avec le code de Thomas -> Ewen
+Faire la détection des obstacles Blueboat -> Thomas
+
+
+A changer :
+
+- Adapter le code pour fonctionnement parallèle avec le code de Thomas
+    - Quoi parallèliser ?
+        - Affichage (lecture seule)
+        - Le reste
+            - Le slam est le seul à écrire dans les observations. Il est en lecture seule dans le reste.
+            - Le dynamic_window_approach_trimmed est le seul à écrire dans les informations de commande. Il est en lecture seule dans le reste.
+            - La simulation ne fait que lire les données (lecture seule) et mettre à jour la position. 
+        - Données utiles :
+            - u
+            - vraies valeurs : state(x,y, theta, v, yaw_rate), les bouées
+            - Xest et Pest
+            - tout ce qui peux être utile pour l'affichage (la range par exemple) 
+
+Autres:
+    - Paires de caméras : Demander à Manzanera des conseils
+
+Ajouter les bouées mobiles
+Corriger dwa avec les bouées (en cours)
+Si problèmes avec le RL -> Rajouter des murs ?
+Voir si Benoit à la télécommande de prête
