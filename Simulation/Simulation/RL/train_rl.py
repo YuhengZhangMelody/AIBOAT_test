@@ -1,5 +1,6 @@
 import argparse
 import os
+from datetime import datetime
 
 from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import EvalCallback
@@ -34,8 +35,9 @@ def main():
     args = parse_args()
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    models_dir = os.path.join(script_dir, "models")
-    logs_dir = os.path.join(script_dir, "logs")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    models_dir = os.path.join(script_dir, f"models_{timestamp}")
+    logs_dir = os.path.join(script_dir, f"logs_{timestamp}")
     os.makedirs(models_dir, exist_ok=True)
     os.makedirs(logs_dir, exist_ok=True)
 
@@ -75,6 +77,8 @@ def main():
         seed=args.seed,
     )
 
+    print(f"Model output dir: {models_dir}")
+    print(f"Log output dir: {logs_dir}")
     print("Debut de l'entrainement...")
     model.learn(total_timesteps=args.timesteps, callback=eval_callback)
 
