@@ -1,0 +1,14 @@
+Evaluation summary
+Episodes: 100
+Model: /home/ensta/ensta-yuheng.zhang/AIBOAT_test/Simulation/Simulation/RL/models/best_model.zip
+VecNormalize: /home/ensta/ensta-yuheng.zhang/AIBOAT_test/Simulation/Simulation/RL/models/vecnormalize.pkl
+Success rate: 100.00%
+Collision rate: 0.00%
+Out-of-bounds rate: 0.00%
+Timeout rate: 0.00%
+Mean return: 297.279 +/- 0.000
+Mean steps: 951.00
+Mean action delta: 0.0304
+Mean radius error: 76.6891 m
+Mean tangent alignment: 0.4147
+Termination breakdown: {'success': 100}
